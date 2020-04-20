@@ -1,6 +1,7 @@
 const worker = require('./worker');
 
 let client;
+let service;
 
 async function execute(event) {
 	const subscribers = await client.smembers(`${event}:subscribers`);
@@ -31,7 +32,7 @@ async function trigger(event, payload) {
 }
 
 async function on(event, name, job) {
-	const subscriber = `${event}:${name}`;
+	const subscriber = `${service}:${event}:${name}`;
 
 	worker.add(subscriber, job);
 
@@ -42,7 +43,7 @@ async function on(event, name, job) {
 }
 
 async function off(event, name) {
-	const subscriber = `${event}:${name}`;
+	const subscriber = `${service}:${event}:${name}`;
 
 	worker.delete(subscriber);
 
@@ -52,8 +53,9 @@ async function off(event, name) {
 	]);
 }
 
-module.exports = redis => {
+module.exports = (redis, name) => {
 	client = redis;
+	service = name;
 
 	return {
 		on,
