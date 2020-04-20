@@ -1,20 +1,20 @@
 {
-  "name": "@koderlife/karrier",
-  "version": "0.0.0",
-  "description": "Redis Event Bus, fault tolerant, process events even the subscriber was off. Redis fail safe PubSub, for event based architectures.",
-  "main": "index.js",
-  "repository": "https://github.com/koderlife/karrier",
-  "homepage": "https://github.com/koderlife/karrier",
-  "bugs": "https://github.com/koderlife/karrier/issues",
-  "author": {
-    "name": "koderlife",
-    "email": "ruben.gonzalezgomez@gmail.com"
-  },
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^13.13.0"
-  },
-  "dependencies": {
-    "ioredis": "^4.16.2"
-  }
+	"name": "@koderlife/karrier",
+	"version": "0.0.0",
+	"description": "Redis Event Bus, fault tolerant, process events even the subscriber was off. Redis fail safe PubSub, for event based architectures.",
+	"main": "index.js",
+	"repository": "https://github.com/koderlife/karrier",
+	"homepage": "https://github.com/koderlife/karrier",
+	"bugs": "https://github.com/koderlife/karrier/issues",
+	"author": {
+		"name": "koderlife",
+		"email": "ruben.gonzalezgomez@gmail.com"
+	},
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^13.13.0"
+	},
+	"dependencies": {
+		"ioredis": "^4.16.2"
+	}
 }
