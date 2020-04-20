@@ -1,0 +1,14 @@
+{
+  "name": "karrier",
+  "version": "0.0.0",
+  "description": "Redis Event Bus, fault tolerant, process events even the subscriber was off. Redis fail safe PubSub, for event based architectures.",
+  "main": "index.js",
+  "author": "koderlife",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^13.13.0"
+  },
+  "dependencies": {
+    "ioredis": "^4.16.2"
+  }
+}
