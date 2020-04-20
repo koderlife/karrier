@@ -1,6 +1,6 @@
 {
 	"name": "@koderlife/karrier",
-	"version": "0.0.0",
+	"version": "0.0.1",
 	"description": "Redis Event Bus, fault tolerant, process events even the subscriber was off. Redis fail safe PubSub, for event based architectures.",
 	"main": "index.js",
 	"repository": "https://github.com/koderlife/karrier",
