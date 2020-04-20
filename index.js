@@ -1,9 +1,9 @@
 const Redis = require('ioredis');
 const emitter = require('./src/emitter');
 
-module.exports = (name, options = {}) => {
+module.exports = (options = {}) => {
 	options = Object.assign({}, options);
-	options.keyPrefix = (options.keyPrefix || 'karrier') + `:${name}:`;
+	options.keyPrefix = (options.keyPrefix || 'karrier');
 
 	client = new Redis(options);
 	const events = emitter(client);

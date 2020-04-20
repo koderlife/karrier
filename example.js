@@ -3,7 +3,7 @@ const { promisify } = require('util');
 
 const sleep = promisify(setTimeout);
 
-karrier('example_application');
+karrier();
 
 karrier.on('foo', 'log', async data => {
 	await sleep(data.sleep)
