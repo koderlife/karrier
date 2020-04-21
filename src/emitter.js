@@ -1,8 +1,9 @@
+const Redis = require('ioredis');
 const worker = require('./worker');
 
 let client;
 let service;
-let subscribed = false;
+let subscribed;
 
 async function execute(event) {
 	const subscribers = await client.smembers(`${event}:subscribers`);
@@ -23,6 +24,7 @@ async function recover(subscriber) {
 
 async function subscribe() {
 	if (!subscribed) {
+		subscribed = true;
 		const subscriber = client.duplicate();
 
 		subscriber.on('message', async (channel, message) => {
@@ -68,8 +70,8 @@ async function off(event, name) {
 	]);
 }
 
-module.exports = (redis, name) => {
-	client = redis;
+module.exports = (name, options) => {
+	client = new Redis(options);
 	service = name;
 
 	return {
