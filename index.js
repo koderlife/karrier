@@ -6,20 +6,6 @@ module.exports = (name, options = {}) => {
 	options.keyPrefix = (options.keyPrefix || 'karrier') + ':';
 
 	client = new Redis(options);
-	const events = emitter(client, name);
 
-	const subscriber = new Redis(options);
-
-	subscriber.on('message', async (channel, message) => {
-		await events.execute(message);
-	});
-
-	subscriber.subscribe('karrier:event');
-
-	process.on('exit', () => {
-		client.disconnect();
-		subscriber.disconnect();
-	});
-
-	Object.assign(module.exports, events);
+	Object.assign(module.exports, emitter(client, name));
 }

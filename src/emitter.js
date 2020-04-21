@@ -2,6 +2,7 @@ const worker = require('./worker');
 
 let client;
 let service;
+let subscribed = false;
 
 async function execute(event) {
 	const subscribers = await client.smembers(`${event}:subscribers`);
@@ -20,6 +21,18 @@ async function recover(subscriber) {
 	await Promise.all(tasks);
 }
 
+async function subscribe() {
+	if (!subscribed) {
+		const subscriber = client.duplicate();
+
+		subscriber.on('message', async (channel, message) => {
+			await execute(message);
+		});
+
+		subscriber.subscribe('karrier:event');
+	}
+}
+
 async function trigger(event, payload) {
 	if (typeof payload === 'object') {
 		payload = JSON.stringify(payload);
@@ -35,6 +48,8 @@ async function on(event, name, job) {
 	const subscriber = `${service}:${event}:${name}`;
 
 	worker.add(subscriber, job);
+
+	subscribe();
 
 	await Promise.all([
 		client.sadd(`${event}:subscribers`, subscriber),
