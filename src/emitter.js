@@ -6,7 +6,7 @@ let service;
 let subscribed;
 
 async function execute(event) {
-	const subscribers = await client.smembers(`${event}:subscribers`);
+	const subscribers = await client.smembers(`subscribers:${event}`);
 
 	await Promise.all(subscribers.map(subscriber => worker.execute(client, subscriber)));
 }
@@ -40,7 +40,7 @@ async function trigger(event, payload) {
 		payload = JSON.stringify(payload);
 	}
 
-	const subscribers = await client.smembers(`${event}:subscribers`);
+	const subscribers = await client.smembers(`subscribers:${event}`);
 
 	await Promise.all(subscribers.map(async subscriber => await client.lpush(`${subscriber}:pending`, payload)));
 	await client.publish('karrier:event', event);
@@ -54,7 +54,7 @@ async function on(event, name, job) {
 	subscribe();
 
 	await Promise.all([
-		client.sadd(`${event}:subscribers`, subscriber),
+		client.sadd(`subscribers:${event}`, subscriber),
 		recover(subscriber)
 	]);
 }
@@ -65,7 +65,7 @@ async function off(event, name) {
 	worker.delete(subscriber);
 
 	await Promise.all([
-		client.sadd(`${event}:subscribers`, subscriber),
+		client.srem(`subscribers:${event}`, subscriber),
 		client.del(`${subscriber}:pending`)
 	]);
 }
