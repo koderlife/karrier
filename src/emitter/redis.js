@@ -1,5 +1,5 @@
 const Redis = require('ioredis');
-const worker = require('./worker');
+const worker = require('../worker');
 
 let client;
 let service;
@@ -77,7 +77,6 @@ module.exports = (name, options) => {
 	return {
 		on,
 		off,
-		execute,
 		trigger
 	}
 }
