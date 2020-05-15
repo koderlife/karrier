@@ -1,25 +1,35 @@
 const Redis = require('ioredis');
-const worker = require('../worker');
+
+const PENDING = ':pending';
+const PROCESSING = ':processing';
+const FAILED = ':failed';
+const workers = {};
 
 let client;
 let service;
-let subscribed;
+let subscribed = false;
 
-async function execute(event) {
-	const subscribers = await client.smembers(`subscribers:${event}`);
+async function execute(subscriber) {
+	if (workers[subscriber]) {
+		const payload = await client.rpoplpush(subscriber + PENDING, subscriber +  PROCESSING);
 
-	await Promise.all(subscribers.map(subscriber => worker.execute(client, subscriber)));
+		try {
+			await workers[subscriber](JSON.parse(payload).payload);
+		} catch(e) {
+			console.error(e);
+			await client.lpush(subscriber + FAILED, payload);
+		}
+
+		await client.lrem(subscriber + PROCESSING, -1, payload)
+	}
 }
 
-async function recover(subscriber) {
-	const llen = await client.llen(`${subscriber}:pending`);
-	const tasks = [];
+async function processPending(subscriber) {
+	const llen = await client.llen(subscriber +  PENDING);
 
 	for (let i = 0; i < llen; i++) {
-		tasks.push(worker.execute(client, subscriber));
+		execute(subscriber);
 	}
-
-	await Promise.all(tasks);
 }
 
 async function subscribe() {
@@ -28,7 +38,7 @@ async function subscribe() {
 		const subscriber = client.duplicate();
 
 		subscriber.on('message', async (channel, message) => {
-			await execute(message);
+			await Promise.all(Object.keys(workers).map(subscriber => execute(subscriber)));
 		});
 
 		subscriber.subscribe('karrier:event');
@@ -36,38 +46,38 @@ async function subscribe() {
 }
 
 async function trigger(event, payload) {
-	if (typeof payload === 'object') {
-		payload = JSON.stringify(payload);
-	}
+	payload = JSON.stringify({
+		created_at: (new Date().getTime()) / 1000,
+		payload: payload
+	});
 
 	const subscribers = await client.smembers(`subscribers:${event}`);
 
-	await Promise.all(subscribers.map(async subscriber => await client.lpush(`${subscriber}:pending`, payload)));
-	await client.publish('karrier:event', event);
+	await client.pipeline(subscribers.map(subscriber => ['lpush', `${subscriber}:pending`, payload])).exec();
+	await client.publish('karrier:event', event)
 }
 
 async function on(event, name, job) {
 	const subscriber = `${service}:${event}:${name}`;
 
-	worker.add(subscriber, job);
-
-	subscribe();
+	workers[subscriber] = job;
 
 	await Promise.all([
 		client.sadd(`subscribers:${event}`, subscriber),
-		recover(subscriber)
+		subscribe(),
+		processPending(subscriber)
 	]);
 }
 
 async function off(event, name) {
 	const subscriber = `${service}:${event}:${name}`;
 
-	worker.delete(subscriber);
+	delete workers[subscriber];
 
-	await Promise.all([
-		client.srem(`subscribers:${event}`, subscriber),
-		client.del(`${subscriber}:pending`)
-	]);
+	await client.pipeline()
+		.srem(`subscribers:${event}`, subscriber)
+		.del(subscriber + PENDING)
+		.exec();
 }
 
 module.exports = (name, options) => {

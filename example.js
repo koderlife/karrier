@@ -11,5 +11,5 @@ karrier.on('foo', 'log', async function(data) {
 	console.log(data.msg);
 });
 
-karrier.trigger('foo', {msg: 'world', sleep: 3000});
 karrier.trigger('foo', {msg: 'hello', sleep: 1000});
+karrier.trigger('foo', {msg: 'world', sleep: 3000});

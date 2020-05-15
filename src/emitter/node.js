@@ -2,7 +2,7 @@ const EventEmitter = require('events').EventEmitter;
 const emitter = new EventEmitter();
 
 module.exports.on = (event, name, worker) => {
-	emitter.on(`${event}`, worker);
+	emitter.on(event, worker);
 }
 
 module.exports.off = event => {
