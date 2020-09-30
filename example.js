@@ -7,11 +7,11 @@ karrier('example', {
 	port: 6379,
 	host: "localhost",
 	db: 0
-}).then(service => {
-	service.listen('foo', async function(data) {
+}).then(async service => {
+	await service.listen('foo', async function(data) {
 		await sleep(data.body.sleep)
 
-		console.log(data)
+		console.log(data.body)
 	})
 
 	service.trigger('foo', {msg: 'hello', sleep: 1000})

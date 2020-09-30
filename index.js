@@ -5,7 +5,7 @@ const services = {}
 module.exports = async (name, options = {}) => {
 	if (!services[name]) {
 		options = Object.assign({
-			keyPrefix: 'karrier',
+			keyPrefix: 'karrier:',
 			lazyConnect: true
 		}, options)
 
