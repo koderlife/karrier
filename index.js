@@ -1,13 +1,16 @@
-const node = require('./src/emitter/node')
+const redis = require('./src/emitter/redis')
 
-module.exports = (name, options = {}) => {
-	const redis = require('./src/emitter/redis')
+const services = {}
 
-	options = Object.assign({}, options)
-	options.keyPrefix = (options.keyPrefix || 'karrier') + ':'
-	options.lazyConnect = true
+module.exports = async (name, options = {}) => {
+	if (!services[name]) {
+		options = Object.assign({
+			keyPrefix: 'karrier',
+			lazyConnect: true
+		}, options)
 
-	Object.assign(module.exports, redis(name, options))
+		services[name] = await redis(name, options)
+	}
+
+	return services[name]
 }
-
-Object.assign(module.exports, node)

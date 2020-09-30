@@ -13,5 +13,8 @@
 	"license": "MIT",
 	"devDependencies": {
 		"@types/node": "^13.13.0"
+	},
+	"dependencies": {
+		"ioredis": "^4.17.3"
 	}
 }

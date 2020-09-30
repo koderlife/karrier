@@ -1,98 +1,99 @@
 const crypto = require('crypto')
+const util = require('util')
+const EventEmitter = require('events').EventEmitter;
 const Redis = require('ioredis')
 
 const PENDING = ':pending'
 const PROCESSING = ':processing'
 const FAILED = ':failed'
-const workers = {}
+
+const emitter = new EventEmitter();
 
 let client
 let service
-let subscribed = false
+
+function uid() {
+	return crypto.randomBytes(16).toString('hex');
+}
 
 async function execute(subscriber) {
-	if (workers[subscriber]) {
-		const data = await client.rpoplpush(subscriber + PENDING, subscriber +  PROCESSING)
+	const data = await client.rpoplpush(subscriber + PENDING, subscriber +  PROCESSING)
 
+	if (data) {
 		try {
 			const message = JSON.parse(data)
-			await workers[subscriber](message.payload, message)
+			await emitter.emit(`${message.type}:${message.to}`, message)
+
+			client.hincrby(`${service}:health`, 'processed', 1)
 		} catch(e) {
 			console.error(e)
-			await client.lpush(subscriber + FAILED, payload)
+			await client.lpush(subscriber + FAILED, data)
 		}
 
-		await client.lrem(subscriber + PROCESSING, -1, payload)
+		await client.lrem(subscriber + PROCESSING, -1, data)
 	}
+
 }
 
-async function processPending(subscriber) {
-	const llen = await client.llen(subscriber +  PENDING)
-
-	for (let i = 0; i < llen; i++) {
-		execute(subscriber)
-	}
-}
-
-async function subscribe() {
-	if (!subscribed) {
-		subscribed = true
-		const subscriber = client.duplicate()
-
-		subscriber.on('message', async (channel, message) => {
-			await Promise.all(Object.keys(workers).map(subscriber => execute(subscriber)))
-		})
-
-		subscriber.subscribe('karrier:event')
-	}
-}
-
-async function trigger(event, payload) {
-	const id = crypto.randomBytes(20).toString('hex')
-	payload = JSON.stringify({
-		id,
-		created_at: (new Date().getTime()),
-		payload: payload
+async function trigger(event, body) {
+	const message = JSON.stringify({
+		id: uid(),
+		from: service,
+		to: event,
+		type: 'event',
+		created_at: (new Date()).getTime(),
+		body
 	})
 
-	const subscribers = await client.smembers(`subscribers:${event}`)
+	client.smembers('services').then(async members => {
+		members.forEach(service => {
+			await client.lpush(`${service}:event:${event}` + PENDING, message)
+			await client.publish('karrier', `${service}:event:${event}`)
+		});
+	});
 
-	await client.pipeline(subscribers.map(subscriber => ['lpush', `${subscriber}:pending`, payload])).exec()
-	await client.publish('karrier:event', event)
-
-	return id
+	return message
 }
 
-async function on(event, name, job) {
-	const subscriber = `${service}:${event}:${name}`
-
-	workers[subscriber] = job
-
-	await Promise.all([
-		client.sadd(`subscribers:${event}`, subscriber),
-		subscribe(),
-		processPending(subscriber)
-	])
+async function listen(event, job) {
+	emitter.on('event:' + event, job);
 }
 
-async function off(event, name) {
-	const subscriber = `${service}:${event}:${name}`
-
-	delete workers[subscriber]
-
-	await client.pipeline()
-		.srem(`subscribers:${event}`, subscriber)
-		.del(subscriber + PENDING)
-		.exec()
+async function forget(event, job) {
+	emitter.off('event:' + event, job)
 }
 
-module.exports = (name, options) => {
-	client = new Redis(options)
+module.exports = async (name, options) => {
 	service = name
+	client = new Redis(options)
+
+	await client.sadd('services', service)
+	client.hset(`${service}:health`, 'processed', 0)
+
+	setInterval(() => {
+		client.hmset(`${service}:health`, {
+			service,
+			instance,
+			uptime: process.uptime(),
+			memory: util.inspect(process.memoryUsage())
+		})
+	}, 10000);
+
+	const listener = client.duplicate()
+
+	listener.on('message', async (channel, message) => {
+		const parts = message.split(':')
+
+		if (parts[0] === service) {
+			execute(message)
+		}
+	})
+
+	await listener.subscribe('karrier')
 
 	return {
-		on,
-		off,
+		listen,
+		forget,
 		trigger
 	}
 }
