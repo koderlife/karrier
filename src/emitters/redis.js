@@ -21,15 +21,13 @@ module.exports = class extends Emitter {
 	async init(service, instance) {
 		super.init(service, instance)
 
-		const client = this.client.duplicate()
-
 		client.on('message', (channel, message) => {
 			if (message.includes(`service:${service}`)) {
 				this._execute(message)
 			}
 		})
 
-		await client.subscribe('karrier')
+		await client.subscribe('karrier:' + service)
 	}
 
 	health(service, instance, activity) {
@@ -58,28 +56,29 @@ module.exports = class extends Emitter {
 	}
 
 	listen(event, service) {
-		this.client.sadd(`event:${event}:listeners`, `service:${service}:event:${event}`)
+		this.client.sadd(`event:${event}:listeners`, service)
 	}
 
 	forget(event, service) {
-		client.srem(`event:${event}:listeners`, `service:${service}:event:${event}`)
+		client.srem(`event:${event}:listeners`, service)
 	}
 
 	async getListeners(event) {
 		return await this.client.smembers(`event:${event}:listeners`)
 	}
 
-	trigger(listener, message) {
+	_send(service, listener, message) {
 		this.client.pipeline()
-			.lpush(listener + this.PENDING, message)
-			.publish('karrier', listener)
+			.lpush(listener + this.PENDING, JSON.stringify(message))
+			.publish('karrier:' + service, listener)
 			.exec()
 	}
 
-	_send(message) {
-		this.client.pipeline()
-			.lpush(`service:${message.to}` + this.PENDING, JSON.stringify(message))
-			.publish('karrier', `service:${message.to}`)
-			.exec()
+	trigger(service, message) {
+		this._send(service, `service:${service}:event:${message.to}`, message)
+	}
+
+	send(message) {
+		this._send(message.to.split(':')[0], `service:${message.to}`, message)
 	}
 }

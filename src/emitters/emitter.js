@@ -27,7 +27,7 @@ module.exports = class {
 	}
 
 	async trigger(event, body) {
-		const message = JSON.stringify(this._buildMessage(event, 'event', body))
+		const message = this._buildMessage(event, 'event', body)
 		const listeners = await this._getListeners(event)
 
 		listeners.forEach(async listener => {

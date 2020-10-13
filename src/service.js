@@ -16,21 +16,35 @@ function buildMessage(to, from, type, body) {
 	}
 }
 
-module.exports = async (name, emitter) => {
-	const instance = uid()
-	const activity = {processed: 0, failed: 0}
-	const events = new EventEmitter()
+module.exports = class {
 
-	await emitter.init(name, instance)
+	constructor(name, emitter) {
+		this.service = name
+		this.instance = uid()
+		this.activity = {processed: 0, failed: 0}
+		this.events = new EventEmitter()
+		this.emitter = emitter.init(name, instance)
 
-	setInterval(() => {
+		setInterval(() => {
+			emitter.health(name, instance, activity)
+		}, 10000)
+
 		emitter.health(name, instance, activity)
-	}, 10000)
+	}
 
-	emitter.health(name, instance, activity)
+	_buildMessage(to, type, body) {
+		return {
+			to,
+			type,
+			body,
+			from: `${this.service}:${this.instance}`,
+			id: uid(),
+			created_at: (new Date()).getTime(),
+		}
+	}
 
-	 _execute(subscriber) {
-		const data = await emitter.getPending(subscriber)
+	async _execute(subscriber) {
+		const data = await this.emitter.getPending(subscriber)
 
 		if (data) {
 			try {
@@ -40,7 +54,7 @@ module.exports = async (name, emitter) => {
 					events.emit(`${message.type}:${message.to}`, message)
 					activity.processed++
 				} else if (message.type === 'event') {
-					emitter.forget(message.to)
+					emitter.forget(message.to, this.service)
 				}
 			} catch(e) {
 				console.error(e)
@@ -52,11 +66,24 @@ module.exports = async (name, emitter) => {
 		}
 	}
 
-	return {
-		listen: (event, task) => {
-			events.on('event:' + event, task)
-			emitter.listen(event, name)
+	listen(event, task) {
+		this.events.on('event:' + event, task)
+		this.emitter.listen(event, name)
+	}
+
+	send(to, body, onReply = null) {
+		const message = this._buildMessage(to, 'message', body)
+
+		if (onReply !== null) {
+			this.events.once(`message:${message.from}:${message.id}`, onReply)
 		}
 
+		this.emitter.send(message)
+
+		return message
+	}
+
+	reply(message, body) {
+		this.send(`${message.from}:${message.id}`, body)
 	}
 }
