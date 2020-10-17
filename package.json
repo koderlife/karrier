@@ -15,7 +15,6 @@
 		"@types/node": "^13.13.0"
 	},
 	"dependencies": {
-		"eventemitter2": "^6.4.3",
 		"ioredis": "^4.17.3"
 	}
 }
