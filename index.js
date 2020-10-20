@@ -20,23 +20,6 @@ function uid() {
 	return randomBytes(16).toString('hex')
 }
 
-function message(cb) {
-	return async message => {
-		let response
-
-		try {
-			response = await cb(message)
-		} catch(e) {
-			response = {
-				success: false,
-				error: e
-			}
-		}
-
-		message.type === 'message' && transport.send(buildMessage(message.from, 'reply', response || { success: true }, `reply:${message.id}`))
-	}
-}
-
 module.exports.init = async (name, trans) => {
 	service = name
 	transport = trans
@@ -70,7 +53,17 @@ module.exports.send = (to, body) => {
 	})
 }
 
-module.exports.onMessage = cb => {
-	transport.on(`message:${service}`, message(cb))
-	transport.on(`message:${service}:${instance}`, message(cb))
+module.exports.onmessage = cb => {
+	transport.onmessage(async message => {
+		let response
+
+		try {
+			response = await cb(message)
+		} catch(e) {
+			console.error(e)
+			response = {success: false, error: e.message}
+		}
+
+		message.type === 'message' && transport.send(buildMessage(message.from, 'reply', response || {success: true}, `reply:${message.id}`))
+	})
 }

@@ -19,23 +19,27 @@ module.exports = class extends EventEmitter {
 	_processMessages(client) {
 		client.on('message', async (channel, message) => {
 			if (!channel.includes(this.instance)) {
-				message = await this.getPending(message)
+				message = await this.getPending()
 				message && message.type === 'event' && this.forget(message.to)
 			} else {
 				message = JSON.parse(message)
 			}
 
-			try {
-				await this.emit(message.action, message)
-				this.activity.processed++
-			} catch(e) {
-				console.error(e)
-				this.activity.failed++
-				this.failed(message)
-			}
-
-			this.done(message)
+			await this.execute(message)
 		})
+	}
+
+	async execute(message) {
+		try {
+			await this.emit(message.action, message)
+			this.activity.processed++
+		} catch(e) {
+			console.error(e)
+			this.activity.failed++
+			this.failed(message)
+		}
+
+		this.done(message)
 	}
 
 	async init(service, instance) {
@@ -63,11 +67,13 @@ module.exports = class extends EventEmitter {
 				memory: JSON.stringify(process.memoryUsage())
 			})
 			.expire(`service:${this.service}:${this.instance}:health`, 10)
+			.sadd(`service:${this.service}:instances`, this.instance)
+			.expire(`service:${this.service}:instances`, 10)
 			.exec()
 	}
 
-	async getPending(subscriber) {
-		return JSON.parse(await this.client.rpoplpush(subscriber + PENDING, subscriber + PROCESSING))
+	async getPending() {
+		return JSON.parse(await this.client.rpoplpush(`service:${this.service}${PENDING}`, `service:${this.service}${PENDING}`))
 	}
 
 	async failed(message) {
@@ -101,5 +107,10 @@ module.exports = class extends EventEmitter {
 				.publish(`karrier:${message.to}`, `service:${message.to}`)
 				.exec()
 		}
+	}
+
+	onmessage(task) {
+		this.on(`message:${this.service}`, task)
+		this.on(`message:${this.service}:${this.instance}`, task)
 	}
 }

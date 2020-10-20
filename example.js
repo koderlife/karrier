@@ -15,9 +15,8 @@ karrier.init('example', new RedisTransport({
 		karrier.send('example', data.body)
 	})
 
-	karrier.onMessage(message => {
+	karrier.onmessage(message => {
 		console.log('MESSAGE', message.body)
-		return message.body[0] + message.body[1]
 	})
 
 	karrier.trigger('foo', {sleep: 1000})
