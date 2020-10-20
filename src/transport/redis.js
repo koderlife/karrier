@@ -25,11 +25,11 @@ module.exports = class extends EventEmitter {
 				message = JSON.parse(message)
 			}
 
-			await this.execute(message)
+			await this._execute(message)
 		})
 	}
 
-	async execute(message) {
+	async _execute(message) {
 		try {
 			await this.emit(message.action, message)
 			this.activity.processed++
