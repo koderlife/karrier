@@ -41,8 +41,7 @@ module.exports.forget = (event, task) => {
 }
 
 module.exports.trigger = async (event, body) => {
-	(await transport.getListeners(event)).forEach(console.log)
-	//(await transport.getListeners(event)).forEach(listener => transport.send(buildMessage(listener, 'event', body, 'event:' + event)))
+	(await transport.getListeners(event)).forEach(listener => transport.send(buildMessage(listener, 'event', body, 'event:' + event)))
 }
 
 module.exports.send = (to, body) => {
