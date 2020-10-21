@@ -41,7 +41,8 @@ module.exports.forget = (event, task) => {
 }
 
 module.exports.trigger = async (event, body) => {
-	(await transport.getListeners(event)).forEach(listener => transport.send(buildMessage(listener, 'event', body, 'event:' + event)))
+	(await transport.getListeners(event)).forEach(console.log)
+	//(await transport.getListeners(event)).forEach(listener => transport.send(buildMessage(listener, 'event', body, 'event:' + event)))
 }
 
 module.exports.send = (to, body) => {
@@ -57,12 +58,12 @@ module.exports.onmessage = cb => {
 	transport.onmessage(async message => {
 		let response
 
-		try {
+		//try {
 			response = await cb(message)
-		} catch(e) {
+		/*} catch(e) {
 			console.error(e)
 			response = {success: false, error: e.message}
-		}
+		}*/
 
 		message.type === 'message' && transport.send(buildMessage(message.from, 'reply', response || {success: true}, `reply:${message.id}`))
 	})

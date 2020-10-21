@@ -67,13 +67,11 @@ module.exports = class extends EventEmitter {
 				memory: JSON.stringify(process.memoryUsage())
 			})
 			.expire(`service:${this.service}:${this.instance}:health`, 10)
-			.sadd(`service:${this.service}:instances`, this.instance)
-			.expire(`service:${this.service}:instances`, 10)
 			.exec()
 	}
 
 	async getPending() {
-		return JSON.parse(await this.client.rpoplpush(`service:${this.service}${PENDING}`, `service:${this.service}${PENDING}`))
+		return JSON.parse(await this.client.rpoplpush(`service:${this.service}${PENDING}`, `service:${this.service}${PROCESSING}`))
 	}
 
 	async failed(message) {

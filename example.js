@@ -10,13 +10,15 @@ karrier.init('example', new RedisTransport({
 	db: 0
 })).then(async () => {
 	karrier.listen('foo', async data => {
+		console.log('got it')
 		await sleep(data.body.sleep)
 
-		karrier.send('example', data.body)
+		karrier.send('example', 'testing message')
 	})
 
 	karrier.onmessage(message => {
 		console.log('MESSAGE', message.body)
+		return 'ack'
 	})
 
 	karrier.trigger('foo', {sleep: 1000})
