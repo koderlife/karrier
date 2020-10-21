@@ -16,16 +16,24 @@ module.exports = class extends EventEmitter {
 		}, options))
 	}
 
-	_processMessages(client) {
-		client.on('message', async (channel, message) => {
-			if (!channel.includes(this.instance)) {
-				message = await this.getPending()
-				message && message.type === 'event' && this.forget(message.to)
-			} else {
-				message = JSON.parse(message)
-			}
+	async _processPending() {
+		const message = await this.getPending()
 
+		if (message) {
+			message.type === 'event' && this.forget(message.to)
 			await this._execute(message)
+		}
+
+		return message
+	}
+
+	async _processMessages(client) {
+		client.on('message', async (channel, message) => {
+			if (channel.includes(this.instance)) {
+				await this._execute(JSON.parse(message))
+			} else {
+				await this._processPending()
+			}
 		})
 	}
 
@@ -67,7 +75,11 @@ module.exports = class extends EventEmitter {
 				memory: JSON.stringify(process.memoryUsage())
 			})
 			.expire(`service:${this.service}:${this.instance}:health`, 10)
+			.sadd(`service:${this.service}:instances`, this.instance)
+			.expire(`service:${this.service}:instances`, 10)
 			.exec()
+
+		while (await this._processPending());
 	}
 
 	async getPending() {
