@@ -1,11 +1,11 @@
-const { EventEmitter } = require('events')
 const Redis = require('ioredis')
+const Transport = require('./transport')
 
 const PENDING = ':pending'
 const PROCESSING = ':processing'
 const FAILED = ':failed'
 
-module.exports = class extends EventEmitter {
+module.exports = class extends Transport {
 
 	constructor(options) {
 		super()
@@ -14,17 +14,6 @@ module.exports = class extends EventEmitter {
 			keyPrefix: 'karrier:',
 			lazyConnect: true
 		}, options))
-	}
-
-	async _processPending() {
-		const message = await this.getPending()
-
-		if (message) {
-			message.type === 'event' && this.forget(message.to)
-			await this._execute(message)
-		}
-
-		return message
 	}
 
 	async _processMessages(client) {
@@ -37,49 +26,44 @@ module.exports = class extends EventEmitter {
 		})
 	}
 
-	async _execute(message) {
-		try {
-			await this.emit(message.action, message)
-			this.activity.processed++
-		} catch(e) {
-			console.error(e)
-			this.activity.failed++
-			this.failed(message)
-		}
-
-		this.done(message)
+	_listen(event) {
+		this.client.sadd(`event:${event}:listeners`, this.service)
 	}
 
-	async init(service, instance) {
-		this.service = service
-		this.instance = instance
-		this.activity = {processed: 0, failed: 0}
+	_forget(event) {
+		this.client.srem(`event:${event}:listeners`, this.service)
+	}
+
+	async init(service) {
+		super.init(service)
+
 		const client = this.client.duplicate()
 
 		this._processMessages(client)
 
 		await Promise.all([
 			client.subscribe(`karrier:${service}`),
-			client.subscribe(`karrier:${service}:${instance}`),
+			client.subscribe(`karrier:${service}:${this.instance}`),
 		]);
 	}
 
-	async health() {
-		this.client.pipeline()
-			.hmset(`service:${this.service}:${this.instance}:health`, {
-				service: this.service,
-				instance: this.instance,
-				pending: await this.client.llen(`service:${this.service}`),
-				activity: JSON.stringify(this.activity),
-				uptime: process.uptime(),
-				memory: JSON.stringify(process.memoryUsage())
-			})
-			.expire(`service:${this.service}:${this.instance}:health`, 10)
-			.sadd(`service:${this.service}:instances`, this.instance)
-			.expire(`service:${this.service}:instances`, 10)
-			.exec()
+	async _health(stats) {
+		const now = Math.round(Date.now() / 1000)
 
-		while (await this._processPending());
+		stats.activity = JSON.stringify(stats.activity)
+
+		await this.client.pipeline()
+			.hmset(`service:${this.service}:${this.instance}:health`, stats)
+			.expire(`service:${this.service}:${this.instance}:health`, 10)
+			.zremrangebyscore(`service:${this.service}:instances`, 0, now)
+			.zremrangebyscore(`services`, 0, now)
+			.zadd(`service:${this.service}:instances`, now + 10, this.instance)
+			.zadd(`services`, now + 10, this.service)
+			.exec()
+	}
+
+	async countPending() {
+		return await this.client.llen(`service:${this.service}`)
 	}
 
 	async getPending() {
@@ -92,16 +76,6 @@ module.exports = class extends EventEmitter {
 
 	async done(message) {
 		this.client.lrem(`service:${message.to}${PROCESSING}`, -1, JSON.stringify(message))
-	}
-
-	listen(event, task) {
-		this.on('event:' + event, task)
-		this.client.sadd(`event:${event}:listeners`, this.service)
-	}
-
-	forget(event, task = null) {
-		task && this.off('event:' + event, task)
-		!this.listenerCount(`event:${event}`) && this.client.srem(`event:${event}:listeners`, this.service)
 	}
 
 	async getListeners(event) {
@@ -117,10 +91,5 @@ module.exports = class extends EventEmitter {
 				.publish(`karrier:${message.to}`, `service:${message.to}`)
 				.exec()
 		}
-	}
-
-	onmessage(task) {
-		this.on(`message:${this.service}`, task)
-		this.on(`message:${this.service}:${this.instance}`, task)
 	}
 }
